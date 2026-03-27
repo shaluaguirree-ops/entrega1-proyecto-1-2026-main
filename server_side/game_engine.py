@@ -114,8 +114,19 @@ def get_current_player():
     """
     Return player_id whose turn it is.
     """
-    pass
+    global board_state
 
+    if board_state["current_player"] is None:
+        return {
+            "message_type": "unicast",
+            "error": "Aún no hay turno asignado."
+        }
+
+    return {
+        "message_type": "broadcast",
+        "current_player": board_state["current_player"],
+        "game_state": board_state["game_state"]
+    }
 
 def next_turn():
     """
