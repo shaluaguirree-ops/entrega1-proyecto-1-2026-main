@@ -96,7 +96,7 @@ def get_players():
         })
     
     return { 
-        "message_type":"broadcast",
+        "message_type":"unicast",
         "players" : players_info,
         "current_player": board_state["current_player"],
         "game_state": board_state["game_state"]
@@ -122,14 +122,16 @@ def get_current_player():
         }
 
     return {
-        "message_type": "broadcast",
+        "message_type": "unicast",
         "current_player": board_state["current_player"],
         "game_state": board_state["game_state"]
     }
 
 def next_turn():
+    pass
     """
     Advance turn to next eligible player.
+    """
     """
     global board_state
 
@@ -158,7 +160,7 @@ def next_turn():
         "current_player": board_state["current_player"]
     }
 
-
+"""
         
 
 
