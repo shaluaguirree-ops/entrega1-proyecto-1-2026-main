@@ -1,4 +1,3 @@
-import uuid
 from random import randint
 
 
