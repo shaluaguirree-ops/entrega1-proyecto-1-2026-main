@@ -89,7 +89,7 @@ def get_players():
 
     players_info = []
     for player in board_state["players"]:
-        players_info.appened({
+        players_info.append({
             "name": player["name"],
             "color": player["color"],
             "pieces": player["pieces"]
@@ -128,11 +128,11 @@ def get_current_player():
     }
 
 def next_turn():
-    pass
+    
     """
     Advance turn to next eligible player.
     """
-    """
+   
     global board_state
 
     if len(board_state["players"]) != 2:
@@ -160,7 +160,7 @@ def next_turn():
         "current_player": board_state["current_player"]
     }
 
-"""
+
         
 
 
@@ -173,67 +173,105 @@ def is_player_turn(player_id):
         return True
     return False
    
-
-
-
-
-# =================================================
-# DICE LOGIC
-# =================================================
-# The roll_dice function should handle both the turn order definition phase and the regular game phase.
 def roll_dice(player_id):
 
     global board_state
     global first_turn
 
-    # If the game was in turn order definition phase, assign the first turn to the player who rolled the highest number
-    if board_state["game_state"]==GAME_STATES[1]: 
-        if is_player_turn(player_id):        
-            dice0, dice1 =random_dices()
-            first_turn["rolls"]+=1
-        
-            if dice0>board_state["dices_value"][0]: # If the current player rolls a higher number, they become the new turn holder
-                first_turn["draw"].clear()
-                first_turn["draw"].add(player_id)
-                first_turn["turn"]=player_id
-            elif dice0==board_state["dices_value"][0]:
-                 first_turn["draw"].add(player_id)
+    # Validar que el jugador exista
+    player_ids = [p["id"] for p in board_state["players"]]
+    if player_id not in player_ids:
+        return {
+            "message_type": "unicast",
+            "error": "Jugador no válido."
+        }
 
+    # =============================
+    # FASE 1: DEFINIR PRIMER TURNO
+    # =============================
+    if board_state["game_state"] == GAME_STATES[1]:
 
-                
+        if not is_player_turn(player_id):
+            return {
+                "message_type": "unicast",
+                "error": "No es tu turno para lanzar."
+            }
 
-            board_state["dices_value"]=(dice0,dice1)
-              
-            if board_state["players"][0]["id"]==player_id:
-                board_state["current_player"]=board_state["players"][1]["id"]
-            if board_state["players"][1]["id"]==player_id:
-                board_state["current_player"]=board_state["players"][0]["id"]
+        dice0, dice1 = random_dices()
+        first_turn["rolls"] += 1
 
-                
-            if first_turn["rolls"]==2: # If all players have rolled, check for ties
-                if len(first_turn["draw"])==1: # If there is no tie, assign the turn to the player with the highest number
-                    board_state["current_player"]=first_turn["turn"]
-                    board_state["game_state"]=GAME_STATES[2] # The game starts
-                else: # If there is a tie, restart the process
-                    first_turn["rolls"]=0                    
-                    first_turn["turn"]=None
-                    first_turn["draw"]=set()
-                    board_state["current_player"]=board_state["players"][0]["id"] # Assign the turn to the first player to start the tie-breaking process
+        # Comparar con el valor anterior
+        if dice0 > board_state["dices_value"][0]:
+            first_turn["draw"].clear()
+            first_turn["draw"].add(player_id)
+            first_turn["turn"] = player_id
 
-    # If the game is already in progress, only the current player is allowed to roll the dice
-    if board_state["game_state"]==GAME_STATES[2]: 
-        if is_player_turn(player_id):        
-            dice0, dice1 =random_dices()
-            board_state["dices_value"]=(dice0,dice1)
+        elif dice0 == board_state["dices_value"][0]:
+            first_turn["draw"].add(player_id)
 
-            # Here come the movement rules based on the dice value, but since the pieces and board are not implemented yet, only the dice value is returned for now
+        # Guardar dados actuales
+        board_state["dices_value"] = (dice0, dice1)
 
+        # Cambiar turno temporal para que lance el otro jugador
+        if board_state["players"][0]["id"] == player_id:
+            board_state["current_player"] = board_state["players"][1]["id"]
+        else:
+            board_state["current_player"] = board_state["players"][0]["id"]
 
+        # Si ambos ya lanzaron
+        if first_turn["rolls"] == 2:
 
-    
-    return {"message_type":"broadcast","board_state": board_state}
+            # Si no hay empate
+            if len(first_turn["draw"]) == 1:
+                board_state["current_player"] = first_turn["turn"]
+                board_state["game_state"] = GAME_STATES[2]
 
-   
+            # Si hay empate → reiniciar proceso
+            else:
+                first_turn["rolls"] = 0
+                first_turn["turn"] = None
+                first_turn["draw"] = set()
+                board_state["current_player"] = board_state["players"][0]["id"]
+
+        return {
+            "message_type": "broadcast",
+            "dice": board_state["dices_value"],
+            "current_player": board_state["current_player"],
+            "game_state": board_state["game_state"]
+        }
+
+    # =============================
+    # FASE 2: JUEGO NORMAL
+    # =============================
+    if board_state["game_state"] == GAME_STATES[2]:
+
+        if not is_player_turn(player_id):
+            return {
+                "message_type": "unicast",
+                "error": "No es tu turno."
+            }
+
+        dice0, dice1 = random_dices()
+        board_state["dices_value"] = (dice0, dice1)
+
+        # Detectar presada (dobles)
+        is_double = dice0 == dice1
+
+        return {
+            "message_type": "broadcast",
+            "dice": (dice0, dice1),
+            "is_double": is_double,
+            "current_player": board_state["current_player"]
+        }
+
+    # =============================
+    # OTROS ESTADOS
+    # =============================
+    return {
+        "message_type": "unicast",
+        "error": "El juego no está listo para lanzar dados."
+    }
+
 
 
 def get_last_dice():
@@ -277,19 +315,67 @@ def can_piece_move(player_id, piece_id, dice_value):
 def move_piece(player_id, piece_id):
     """
     Perform movement.
-
-    Must:
-    - Validate turn
-    - Validate dice was rolled
-    - Validate move legality
-    - Update board
-    - Handle captures
-    - Check win condition
-    - Possibly change turn
-
-    Return result dictionary.
     """
-    pass
+    global board_state
+
+    # Validar turno
+    if board_state["current_player"] != player_id:
+        return {
+            "message_type": "unicast",
+            "error": "No es tu turno."
+        }
+
+    # Validar dado lanzado
+    dice = board_state["last_dice"]
+    if dice is None:
+        return {
+            "message_type": "unicast",
+            "error": "Debes lanzar el dado primero."
+        }
+
+    # Buscar jugador
+    player = None
+    for p in board_state["players"]:
+        if p["id"] == player_id:
+            player = p
+            break
+
+    if player is None:
+        return {
+            "message_type": "unicast",
+            "error": "Jugador no encontrado."
+        }
+
+    # Buscar ficha
+    piece = None
+    for pc in player["pieces"]:
+        if pc["piece_id"] == piece_id:
+            piece = pc
+            break
+
+    if piece is None:
+        return {
+            "message_type": "unicast",
+            "error": "Ficha no encontrada."
+        }
+
+    # Movimiento simple
+    piece["position"] += dice
+
+    # Reiniciar dado
+    board_state["last_dice"] = None
+
+    # Cambiar turno
+    next_turn()
+
+    return {
+        "message_type": "broadcast",
+        "player_id": player_id,
+        "piece_id": piece_id,
+        "new_position": piece["position"],
+        "current_player": board_state["current_player"]
+    }
+   
 
 
 # =================================================
